@@ -22,8 +22,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         item.menu = menu
         statusItem = item
+        ProfileAccess.listen()
         // Refresh the profile cache the CLI reads.
-        _ = ChromeProfile.list(for: "com.google.Chrome")
+        _ = ChromeProfile.list(for: ProfileAccess.chromeID)
     }
 
     /// Local .html files and webloc drops arrive here instead of as URL events.

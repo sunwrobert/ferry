@@ -6,6 +6,7 @@ enum CLI {
     ferry: route links to the right browser and Chrome profile
 
     USAGE
+      ferry setup                       Ask Ferry.app for access to Chrome profiles (shows the macOS prompt)
       ferry browsers [--json]           List browsers and Chrome profiles (names usable below)
       ferry config [--json | --path]    Show the config
       ferry default <browser> [--profile <p>]
@@ -26,6 +27,7 @@ enum CLI {
     static func run(_ command: String, _ args: [String]) -> Int32 {
         let result: Result<Void, CLIError>
         switch command {
+        case "setup": result = setup()
         case "browsers": result = browsers(args)
         case "config": result = config(args)
         case "default": result = setDefault(args)
@@ -48,7 +50,25 @@ enum CLI {
 
     // MARK: Commands
 
+    private static func setup() -> Result<Void, CLIError> {
+        guard ProfileAccess.requestFromApp() else {
+            return .failure(CLIError(
+                "still can't read Chrome profiles. If you clicked Don't Allow, enable Ferry under "
+                    + "System Settings → Privacy & Security → App Management / Full Disk Access, then run `ferry setup` again."))
+        }
+        let profiles = ChromeProfile.list(for: ProfileAccess.chromeID)
+        print("Chrome profiles: \(profiles.map { "\($0.name) [\($0.directory)]" }.joined(separator: ", "))")
+        if !isSystemBrowser { print("Next: choose \"Make Ferry the System Browser\" in Ferry's menu so clicked links are routed.") }
+        return .success(())
+    }
+
+    private static var isSystemBrowser: Bool {
+        let handler = NSWorkspace.shared.urlForApplication(toOpen: URL(string: "https://example.com")!)
+        return handler.flatMap { Bundle(url: $0)?.bundleIdentifier } == "com.sunwrobert.ferry"
+    }
+
     private static func browsers(_ args: [String]) -> Result<Void, CLIError> {
+        _ = ProfileAccess.requestFromApp()
         let list = Browser.installed().map { browser in
             BrowserInfo(
                 name: browser.name,
@@ -65,7 +85,7 @@ enum CLI {
                 print("    \(profile.name)  [\(profile.directory)]\(profile.email.map { "  \($0)" } ?? "")")
             }
             if ChromeProfile.supports(browser.bundleID) && browser.profiles.isEmpty {
-                print("    (profiles unknown: open Ferry's menu once and allow access to Chrome's data)")
+                print("    (profiles unknown: run `ferry setup`)")
             }
         }
         return .success(())
@@ -191,12 +211,15 @@ enum CLI {
             return .failure(CLIError("no browser matches '\(browser)'. Installed: \(installed.map(\.name).joined(separator: ", "))"))
         }
         guard let profile else { return .success((match.bundleID, nil)) }
+        if ChromeProfile.supports(match.bundleID), !ChromeProfile.isFolderName(profile) {
+            _ = ProfileAccess.requestFromApp()
+        }
         guard let directory = ChromeProfile.resolve(profile, for: match.bundleID) else {
             let profiles = ChromeProfile.list(for: match.bundleID)
             guard !profiles.isEmpty else {
                 return .failure(CLIError(
-                    "can't read \(match.name)'s profiles yet, so '\(profile)' can't be checked. "
-                        + "Open Ferry's menu once and allow access to Chrome's data, or use a folder name like 'Default' or 'Profile 1'."))
+                    "can't read \(match.name)'s profiles, so '\(profile)' can't be checked. "
+                        + "Run `ferry setup` and click Allow, or use a folder name like 'Default' or 'Profile 1'."))
             }
             let names = profiles.map { "\($0.name) [\($0.directory)]" }.joined(separator: ", ")
             return .failure(CLIError("\(match.name) has no profile '\(profile)'. Profiles: \(names)"))

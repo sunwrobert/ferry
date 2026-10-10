@@ -9,7 +9,8 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$(swift build -c release --show-bin-path)/Ferry" "$APP/Contents/MacOS/Ferry"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
-codesign --force --sign - "$APP"
+# Pin the designated requirement to the bundle ID so macOS privacy grants survive rebuilds.
+codesign --force --sign - -r='designated => identifier "com.sunwrobert.ferry"' "$APP"
 echo "Built $APP"
 
 if [[ "${1:-}" == "--install" ]]; then
