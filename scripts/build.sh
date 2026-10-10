@@ -18,6 +18,8 @@ if [[ "${1:-}" == "--install" ]]; then
   rm -rf ~/Applications/Ferry.app
   cp -R "$APP" ~/Applications/Ferry.app
   /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f ~/Applications/Ferry.app
+  mkdir -p ~/.local/bin
+  ln -sf ~/Applications/Ferry.app/Contents/MacOS/Ferry ~/.local/bin/ferry
   open ~/Applications/Ferry.app
-  echo "Installed ~/Applications/Ferry.app"
+  echo "Installed ~/Applications/Ferry.app and ~/.local/bin/ferry"
 fi

@@ -10,16 +10,12 @@ final class Router: NSObject {
             showPicker(for: url, config: config)
             return
         }
-        if let rule = config.rules.first(where: { $0.matches(url, source: source) }),
-           let browser = Browser.find(rule.browser) {
-            browser.open([url], profile: rule.profile)
-            return
+        switch Decision.make(for: url, source: source, config: config) {
+        case let .open(bundleID, profile, _):
+            Browser.find(bundleID)?.open([url], profile: profile)
+        case .picker:
+            showPicker(for: url, config: config)
         }
-        if let id = config.defaultBrowser, let browser = Browser.find(id) {
-            browser.open([url], profile: config.defaultProfile)
-            return
-        }
-        showPicker(for: url, config: config)
     }
 
     private func showPicker(for url: URL, config: Config) {

@@ -20,6 +20,34 @@ Pure Swift + AppKit, no dependencies, ~180 KB binary. No windows or web views. I
 
 That builds `Ferry.app`, copies it to `~/Applications`, and launches it. Then open the menu bar icon, choose **Make Ferry the System Browser**, and confirm the macOS prompt.
 
+## CLI
+
+`./scripts/build.sh --install` also links the CLI to `~/.local/bin/ferry`.
+
+```bash
+ferry browsers                                            # browsers and Chrome profiles
+ferry add --host youtube.com --browser chrome --profile Personal
+ferry add --host devin.ai --browser chrome --profile you@work.com
+ferry add --from-app slack --browser chrome --profile Work
+ferry default chrome --profile Personal
+ferry rules                                               # numbered; first match wins
+ferry move 3 1
+ferry remove 2
+ferry test https://www.youtube.com/watch?v=x              # where would this go?
+```
+
+Run `ferry help` for everything. The CLI checks browser and profile names against what is installed, so a typo errors instead of silently creating a new Chrome profile.
+
+## Agents
+
+[`skills/ferry/SKILL.md`](skills/ferry/SKILL.md) teaches an agent to use the CLI. Link it into your skills folder:
+
+```bash
+ln -s "$PWD/skills/ferry" ~/.agents/skills/ferry
+```
+
+Then just say something like "open YouTube in my personal Chrome profile and Devin in my work one".
+
 ## Config
 
 The config file is `~/.config/ferry/config.json`. It is read on every link, so edits apply immediately.

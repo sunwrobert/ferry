@@ -22,6 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         item.menu = menu
         statusItem = item
+        // Refresh the profile cache the CLI reads.
+        _ = ChromeProfile.list(for: "com.google.Chrome")
     }
 
     /// Local .html files and webloc drops arrive here instead of as URL events.
@@ -81,7 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func isDefault(_ target: Target, _ config: Config) -> Bool {
         guard target.browser.bundleID == config.defaultBrowser else { return false }
         guard let profile = target.profile else { return config.defaultProfile == nil }
-        return config.defaultProfile.map { ChromeProfile.resolve($0, for: target.browser.bundleID) } == profile.directory
+        return config.defaultProfile.flatMap { ChromeProfile.resolve($0, for: target.browser.bundleID) } == profile.directory
     }
 
     @objc private func setDefault(_ sender: NSMenuItem) {

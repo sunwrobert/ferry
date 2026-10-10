@@ -14,7 +14,7 @@ struct Browser {
     /// Every installed app that can open https links, except Ferry.
     static func installed(hiding hidden: [String] = []) -> [Browser] {
         let probe = URL(string: "https://example.com")!
-        let ownID = Bundle.main.bundleIdentifier
+        let ownID = "com.sunwrobert.ferry" // Bundle.main has no ID when run through the CLI symlink
         var seen = Set<String>()
         return NSWorkspace.shared.urlsForApplications(toOpen: probe)
             .compactMap { url -> Browser? in
@@ -34,14 +34,15 @@ struct Browser {
     func open(_ urls: [URL], profile: String? = nil) {
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true
-        guard let profile else {
+        guard let profile, let directory = ChromeProfile.resolve(profile, for: bundleID) else {
+            if let profile { NSLog("Ferry: unknown profile '\(profile)', opening without one") }
             NSWorkspace.shared.open(urls, withApplicationAt: appURL, configuration: configuration)
             return
         }
         // Same as `open -na Chrome --args`: the new instance hands the link to the running one
         // in the requested profile, then exits.
         configuration.createsNewApplicationInstance = true
-        configuration.arguments = ["--profile-directory=\(ChromeProfile.resolve(profile, for: bundleID))"]
+        configuration.arguments = ["--profile-directory=\(directory)"]
             + urls.map(\.absoluteString)
         NSWorkspace.shared.openApplication(at: appURL, configuration: configuration) { _, error in
             if let error { NSLog("Ferry: profile launch failed: \(error)") }
