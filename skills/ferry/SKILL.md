@@ -42,6 +42,7 @@ ferry test https://example.com --from-app slack
 
 ## Errors
 
-- `can't read Google Chrome's profiles`: run `ferry setup`; it asks Ferry.app to show the macOS prompt. Tell the user to click Allow, then retry. Meanwhile folder names (`Default`, `Profile 1`) still work.
+- Output is structured (TOON by default; add `--json` if you prefer JSON). Errors include a `code` and suggested commands.
+- `PROFILES_UNREADABLE` / `can't read Google Chrome's profiles`: run `ferry setup`; it asks Ferry.app to show the macOS prompt. Tell the user to click Allow, then retry. Meanwhile folder names (`Default`, `Profile 1`) still work.
 - `no browser matches`: the error lists what is installed; use one of those names.
 - Rules only apply if Ferry is the system browser. If `ferry test` looks right but clicks don't route, ask the user to choose "Make Ferry the System Browser" in Ferry's menu.

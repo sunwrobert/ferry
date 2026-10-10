@@ -40,6 +40,18 @@ Every menu action has a CLI equivalent: `ferry set <n>` (change where a rule ope
 
 ## Agents
 
+The CLI is built on [swiftcur](https://github.com/sunwrobert/swiftcur), so every command returns structured output (`--json`, `--format yaml`, …), and agents get:
+
+```bash
+ferry --llms        # compact command list for an agent's context
+ferry skills add    # install the Ferry skill for Claude Code, Codex, Cursor, and other agents
+ferry mcp add       # register Ferry as an MCP server
+ferry --mcp         # run the MCP server over stdio
+eval "$(ferry completions zsh)"
+```
+
+Misspelled flags are errors, and failures suggest the next command to run.
+
 [`skills/ferry/SKILL.md`](skills/ferry/SKILL.md) teaches an agent to use the CLI. Link it into your skills folder:
 
 ```bash

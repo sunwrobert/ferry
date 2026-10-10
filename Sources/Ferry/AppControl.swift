@@ -70,24 +70,18 @@ enum AppControl {
         configuration.activates = false
         NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)
 
-        var answer: String?
+        let answer = Reply()
         let observer = DistributedNotificationCenter.default().addObserver(forName: reply, object: nil, queue: nil) { note in
-            answer = note.object as? String
+            answer.set(note.object as? String)
         }
         defer { DistributedNotificationCenter.default().removeObserver(observer) }
 
-        let deadline = Date().addingTimeInterval(timeout)
-        var nextPost = Date()
-        while answer == nil, Date() < deadline {
-            if Date() >= nextPost {
-                DistributedNotificationCenter.default().postNotificationName(
-                    request, object: command.rawValue, userInfo: nil, deliverImmediately: true)
-                // Repeats only reach the app before it is listening; every command is idempotent anyway.
-                nextPost = Date().addingTimeInterval(1)
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        // Repeats only reach the app before it is listening; every command is idempotent anyway.
+        answer.wait(timeout: timeout) {
+            DistributedNotificationCenter.default().postNotificationName(
+                request, object: command.rawValue, userInfo: nil, deliverImmediately: true)
         }
-        return answer
+        return answer.value.value
     }
 
     nonisolated static func quit() -> Bool {

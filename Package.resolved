@@ -1,0 +1,14 @@
+{
+  "pins" : [
+    {
+      "identity" : "swiftcur",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sunwrobert/swiftcur",
+      "state" : {
+        "branch" : "main",
+        "revision" : "90d2fdf51a5dee82cd9fb3c75b0ef649a1ad6b4e"
+      }
+    }
+  ],
+  "version" : 2
+}

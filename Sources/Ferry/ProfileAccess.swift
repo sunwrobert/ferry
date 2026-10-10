@@ -37,9 +37,9 @@ enum ProfileAccess {
             return false
         }
 
-        var answered = false
-        let observer = DistributedNotificationCenter.default().addObserver(forName: reply, object: nil, queue: nil) { _ in
-            answered = true
+        let answered = Reply()
+        let observer = DistributedNotificationCenter.default().addObserver(forName: reply, object: nil, queue: nil) { note in
+            answered.set(note.object as? String)
         }
         defer { DistributedNotificationCenter.default().removeObserver(observer) }
 
@@ -50,17 +50,9 @@ enum ProfileAccess {
         NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)
 
         // Send until the app is up; it replies once profiles are readable or it gives up.
-        let deadline = Date().addingTimeInterval(timeout)
-        var nextPost = Date()
-        var sends = 0
-        while !answered, Date() < deadline {
-            if Date() >= nextPost, sends < 5 {
-                DistributedNotificationCenter.default().postNotificationName(
-                    request, object: nil, userInfo: nil, deliverImmediately: true)
-                sends += 1
-                nextPost = Date().addingTimeInterval(1)
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        answered.wait(timeout: timeout, posts: 5) {
+            DistributedNotificationCenter.default().postNotificationName(
+                request, object: nil, userInfo: nil, deliverImmediately: true)
         }
         return !ChromeProfile.list(for: chromeID).isEmpty
     }
