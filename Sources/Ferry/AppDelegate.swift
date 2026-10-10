@@ -1,9 +1,9 @@
 import AppKit
-import ServiceManagement
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let router = Router()
+    private let rulesMenu = RulesMenu()
     private var statusItem: NSStatusItem?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item.menu = menu
         statusItem = item
         ProfileAccess.listen()
+        AppControl.listen()
         // Refresh the profile cache the CLI reads.
         _ = ChromeProfile.list(for: ProfileAccess.chromeID)
     }
@@ -62,14 +63,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         defaultItem.submenu = submenu
         menu.addItem(defaultItem)
 
-        menu.addItem(makeItem("Edit Rules…", #selector(editConfig), key: ","))
+        rulesMenu.build(into: menu, config: config)
+        menu.addItem(makeItem("Edit Config File…", #selector(editConfig), key: ","))
         menu.addItem(.separator())
 
-        if !isSystemDefault {
+        if ChromeProfile.list(for: ProfileAccess.chromeID).isEmpty,
+           NSWorkspace.shared.urlForApplication(withBundleIdentifier: ProfileAccess.chromeID) != nil {
+            menu.addItem(makeItem("Allow Access to Chrome Profiles…", #selector(requestProfileAccess)))
+        }
+
+        if !AppControl.isSystemBrowser {
             menu.addItem(makeItem("Make Ferry the System Browser", #selector(becomeSystemDefault)))
         }
         let login = makeItem("Launch at Login", #selector(toggleLaunchAtLogin))
-        login.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        login.state = AppControl.isLaunchAtLogin ? .on : .off
         menu.addItem(login)
         menu.addItem(.separator())
         menu.addItem(makeItem("Quit Ferry", #selector(quit), key: "q"))
@@ -95,38 +102,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         config.save()
     }
 
-    @objc private func editConfig() {
-        _ = Config.load() // creates the starter file if missing
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        process.arguments = ["-t", Config.fileURL.path]
-        try? process.run()
+    /// Reading Chrome's data is what makes macOS show the prompt; retry while the user answers it.
+    @objc private func requestProfileAccess() {
+        ProfileAccess.readUntilAllowed(attemptsLeft: 60)
     }
 
-    private var isSystemDefault: Bool {
-        let current = NSWorkspace.shared.urlForApplication(toOpen: URL(string: "https://example.com")!)
-        return current.flatMap { Bundle(url: $0)?.bundleIdentifier } == Bundle.main.bundleIdentifier
+    @objc private func editConfig() {
+        Config.openInEditor()
     }
 
     @objc private func becomeSystemDefault() {
-        let me = Bundle.main.bundleURL
-        for scheme in ["http", "https"] {
-            NSWorkspace.shared.setDefaultApplication(at: me, toOpenURLsWithScheme: scheme) { error in
-                if let error { NSLog("Ferry: could not set default for \(scheme): \(error)") }
-            }
-        }
+        AppControl.becomeSystemBrowser()
     }
 
     @objc private func toggleLaunchAtLogin() {
-        do {
-            if SMAppService.mainApp.status == .enabled {
-                try SMAppService.mainApp.unregister()
-            } else {
-                try SMAppService.mainApp.register()
-            }
-        } catch {
-            NSLog("Ferry: launch at login failed: \(error)")
-        }
+        AppControl.setLaunchAtLogin(!AppControl.isLaunchAtLogin)
     }
 
     @objc private func quit() {

@@ -22,6 +22,10 @@ struct Rule: Codable {
         return true
     }
 
+    func hasSameMatcher(as other: Rule) -> Bool {
+        host?.lowercased() == other.host?.lowercased() && regex == other.regex && fromApp == other.fromApp
+    }
+
     private static func hostMatches(_ host: String?, pattern: String) -> Bool {
         guard let host else { return false }
         let bare = pattern.hasPrefix("*.") ? String(pattern.dropFirst(2)) : pattern
@@ -62,6 +66,28 @@ struct Config: Codable {
             NSLog("Ferry: invalid config, showing picker: \(error)")
             return Config(defaultBrowser: nil, defaultProfile: nil, rules: [], hiddenBrowsers: nil)
         }
+    }
+
+    /// Replace the rule with the same matcher, or insert at `index` (0-based, clamped).
+    /// Returns the rule's final 0-based position.
+    @discardableResult
+    mutating func upsert(_ rule: Rule, at index: Int) -> Int {
+        if let existing = rules.firstIndex(where: { $0.hasSameMatcher(as: rule) }) {
+            rules[existing] = rule
+            return existing
+        }
+        let position = min(max(index, 0), rules.count)
+        rules.insert(rule, at: position)
+        return position
+    }
+
+    /// Creates the starter file if missing, then opens it in the default text editor.
+    static func openInEditor() {
+        _ = load()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = ["-t", fileURL.path]
+        try? process.run()
     }
 
     func save() {

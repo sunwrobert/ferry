@@ -15,8 +15,14 @@ enum CLI {
       ferry add --browser <b> [--profile <p>] [--host <h>] [--regex <r>] [--from-app <a>] [--at <n>]
       ferry remove <n>                  Remove rule n
       ferry move <n> <m>                Move rule n to position m (first match wins)
+      ferry set <n> --browser <b> [--profile <p>]   Change where rule n opens
       ferry test <url> [--from-app <a>] Show where a link would go, without opening it
       ferry open <url> [--from-app <a>] Route a link for real
+      ferry status                      System browser, launch at login, profile access
+      ferry system-browser              Make Ferry the system browser (macOS asks to confirm)
+      ferry login on|off                Launch at login
+      ferry edit                        Open the config file in your text editor
+      ferry quit                        Quit the menu bar app
 
     <browser> is a bundle ID or app name (chrome, "Google Chrome", com.google.Chrome).
     <p> is a Chrome profile folder, display name, or email.
@@ -35,6 +41,12 @@ enum CLI {
         case "add": result = add(args)
         case "remove": result = remove(args)
         case "move": result = move(args)
+        case "set": result = retarget(args)
+        case "status": result = status()
+        case "system-browser": result = systemBrowser()
+        case "login": result = login(args)
+        case "edit": result = .success(Config.openInEditor())
+        case "quit": result = AppControl.quit() ? .success(print("Quit Ferry.")) : .failure(CLIError("Ferry is not running"))
         case "test": result = test(args, open: false)
         case "open": result = test(args, open: true)
         case "help", "-h", "--help": result = .success(print(usage))
@@ -138,7 +150,7 @@ enum CLI {
         var config = Config.load()
         let rule = Rule(host: host, regex: regex, fromApp: fromApp, browser: id, profile: profile)
         let position = options.take("--at").flatMap(Int.init) ?? config.rules.count + 1
-        config.rules.insert(rule, at: min(max(position, 1), config.rules.count + 1) - 1)
+        config.upsert(rule, at: position - 1) // same matcher as an existing rule replaces it
         config.save()
         printRules(config)
         return .success(())
@@ -161,6 +173,50 @@ enum CLI {
         config.rules.insert(config.rules.remove(at: from), at: to)
         config.save()
         printRules(config)
+        return .success(())
+    }
+
+    private static func retarget(_ args: [String]) -> Result<Void, CLIError> {
+        var options = Options(args)
+        var config = Config.load()
+        guard let index = ruleIndex(options.positional.first, in: config), let name = options.take("--browser") else {
+            return .failure(CLIError("usage: ferry set <n> --browser <b> [--profile <p>] (see `ferry rules`)"))
+        }
+        let resolved = resolveTarget(browser: name, profile: options.take("--profile"))
+        guard case let .success((id, profile)) = resolved else { return resolved.map { _ in } }
+        config.rules[index].browser = id
+        config.rules[index].profile = profile
+        config.save()
+        printRules(config)
+        return .success(())
+    }
+
+    private static func status() -> Result<Void, CLIError> {
+        guard let reply = AppControl.send(.status) else { return .failure(CLIError("Ferry.app did not respond")) }
+        let profiles = ChromeProfile.list(for: ProfileAccess.chromeID)
+        print("System browser:   \(isSystemBrowser ? "yes" : "no (run `ferry system-browser`)")")
+        print("Launch at login:  \(reply == "login=true" ? "on" : "off")")
+        print("Chrome profiles:  \(profiles.isEmpty ? "not readable (run `ferry setup`)" : profiles.map(\.name).joined(separator: ", "))")
+        print("Config:           \(Config.fileURL.path)")
+        return .success(())
+    }
+
+    private static func systemBrowser() -> Result<Void, CLIError> {
+        if isSystemBrowser { return .success(print("Ferry is already the system browser.")) }
+        guard AppControl.send(.systemBrowser) != nil else { return .failure(CLIError("Ferry.app did not respond")) }
+        print("Asked macOS to make Ferry the system browser. Confirm the dialog, then check with `ferry status`.")
+        return .success(())
+    }
+
+    private static func login(_ args: [String]) -> Result<Void, CLIError> {
+        let command: AppControl.Command
+        switch args.first {
+        case "on": command = .loginOn
+        case "off": command = .loginOff
+        default: return .failure(CLIError("usage: ferry login on|off"))
+        }
+        guard let reply = AppControl.send(command) else { return .failure(CLIError("Ferry.app did not respond")) }
+        print("Launch at login: \(reply == "login=true" ? "on" : "off")")
         return .success(())
     }
 
@@ -230,8 +286,7 @@ enum CLI {
     /// Bundle ID for an app name; anything already shaped like a bundle ID passes through.
     private static func resolveApp(_ value: String) -> String {
         if value.contains("."), NSWorkspace.shared.urlForApplication(withBundleIdentifier: value) != nil { return value }
-        let path = NSWorkspace.shared.fullPath(forApplication: value)
-            ?? ["/Applications", "/System/Applications"].lazy
+        let path = ["/Applications", "/System/Applications", NSHomeDirectory() + "/Applications"].lazy
                 .compactMap { dir in try? FileManager.default.contentsOfDirectory(atPath: dir).first {
                     $0.lowercased().hasSuffix(".app") && $0.lowercased().contains(value.lowercased())
                 }.map { "\(dir)/\($0)" } }

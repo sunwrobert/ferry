@@ -10,7 +10,7 @@ Pure Swift + AppKit, no dependencies, ~180 KB binary. No windows or web views. I
 - Chrome profiles: every profile appears in the picker and the Default Browser menu, and rules can target a profile by folder (`Profile 1`), name (`Work`), or email
 - A picker menu at the cursor when no rule matches, or when you hold **⌥ Option** while clicking a link. Use number keys `1`–`9` to choose a browser.
 - Copy Link from the picker
-- Menu bar: choose the default browser, edit rules, set Ferry as the system browser, launch at login
+- Menu bar: choose the default browser; add, retarget, reorder, and delete rules; "Always Open <site> In…" from the picker; set Ferry as the system browser; launch at login
 
 ## Install
 
@@ -36,7 +36,7 @@ ferry remove 2
 ferry test https://www.youtube.com/watch?v=x              # where would this go?
 ```
 
-Run `ferry help` for everything. The CLI checks browser and profile names against what is installed, so a typo errors instead of silently creating a new Chrome profile.
+Every menu action has a CLI equivalent: `ferry set <n>` (change where a rule opens), `ferry status`, `ferry system-browser`, `ferry login on|off`, `ferry edit`, `ferry quit`. Run `ferry help` for everything. The CLI checks browser and profile names against what is installed, so a typo errors instead of silently creating a new Chrome profile.
 
 ## Agents
 

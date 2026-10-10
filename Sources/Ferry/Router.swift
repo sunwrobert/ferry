@@ -38,6 +38,21 @@ final class Router: NSObject {
             menu.addItem(item)
         }
 
+        if let host = RulesMenu.siteHost(url) {
+            let always = NSMenuItem(title: "Always Open \(host) In", action: nil, keyEquivalent: "")
+            let choices = NSMenu()
+            for target in Target.all(hiding: config.hiddenBrowsers ?? []) {
+                let choice = NSMenuItem(title: target.title, action: #selector(pickAlways(_:)), keyEquivalent: "")
+                choice.target = self
+                choice.image = target.browser.icon
+                choice.representedObject = target
+                choices.addItem(choice)
+            }
+            always.submenu = choices
+            menu.addItem(.separator())
+            menu.addItem(always)
+        }
+
         menu.addItem(.separator())
         let copy = NSMenuItem(title: "Copy Link", action: #selector(copyLink), keyEquivalent: "c")
         copy.target = self
@@ -49,6 +64,15 @@ final class Router: NSObject {
 
     @objc private func pick(_ sender: NSMenuItem) {
         guard let url = pendingURL, let target = sender.representedObject as? Target else { return }
+        target.browser.open([url], profile: target.profile?.directory)
+        pendingURL = nil
+    }
+
+    /// Open the link and save a rule so this site skips the picker next time.
+    @objc private func pickAlways(_ sender: NSMenuItem) {
+        guard let url = pendingURL, let host = RulesMenu.siteHost(url),
+              let target = sender.representedObject as? Target else { return }
+        RulesMenu.save(rule: Rule(host: host, browser: target.browser.bundleID, profile: target.profile?.directory), at: nil)
         target.browser.open([url], profile: target.profile?.directory)
         pendingURL = nil
     }

@@ -17,7 +17,7 @@ enum ProfileAccess {
 
     /// The first failed read shows the macOS prompt without blocking, so keep retrying while it is on screen.
     @MainActor
-    private static func readUntilAllowed(attemptsLeft: Int) {
+    static func readUntilAllowed(attemptsLeft: Int) {
         let count = ChromeProfile.list(for: chromeID).count
         guard count == 0, attemptsLeft > 0 else {
             DistributedNotificationCenter.default().postNotificationName(
