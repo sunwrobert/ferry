@@ -7,7 +7,7 @@ Pure Swift + AppKit, no dependencies, ~180 KB binary. No windows or web views. I
 ## Features
 
 - Rules by host (subdomains included), URL regex, or the app the link was clicked in
-- Chromium profile support (`"profile": "Profile 1"`)
+- Chrome profiles: every profile appears in the picker and the Default Browser menu, and rules can target a profile by folder (`Profile 1`), name (`Work`), or email
 - A picker menu at the cursor when no rule matches, or when you hold **⌥ Option** while clicking a link. Use number keys `1`–`9` to choose a browser.
 - Copy Link from the picker
 - Menu bar: choose the default browser, edit rules, set Ferry as the system browser, launch at login
@@ -26,12 +26,13 @@ The config file is `~/.config/ferry/config.json`. It is read on every link, so e
 
 ```json
 {
-  "defaultBrowser": "com.apple.Safari",
+  "defaultBrowser": "com.google.Chrome",
+  "defaultProfile": "Personal",
   "hiddenBrowsers": [],
   "rules": [
     { "host": "meet.google.com", "browser": "com.google.Chrome" },
-    { "host": "github.com", "browser": "com.google.Chrome", "profile": "Profile 1" },
-    { "fromApp": "com.tinyspeck.slackmacgap", "browser": "company.thebrowser.Browser" },
+    { "host": "github.com", "browser": "com.google.Chrome", "profile": "you@work.com" },
+    { "fromApp": "com.tinyspeck.slackmacgap", "browser": "com.google.Chrome", "profile": "Work" },
     { "regex": "^https://.*\\.atlassian\\.net/", "browser": "com.google.Chrome" }
   ]
 }

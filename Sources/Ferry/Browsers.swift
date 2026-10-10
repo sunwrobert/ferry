@@ -20,35 +20,56 @@ struct Browser {
             .compactMap { url -> Browser? in
                 guard let id = Bundle(url: url)?.bundleIdentifier,
                       id != ownID, !hidden.contains(id), seen.insert(id).inserted else { return nil }
-                let name = FileManager.default.displayName(atPath: url.path)
-                    .replacingOccurrences(of: ".app", with: "")
-                return Browser(bundleID: id, name: name, appURL: url)
+                return Browser(bundleID: id, name: displayName(url), appURL: url)
             }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     static func find(_ bundleID: String) -> Browser? {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
-        let name = FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
-        return Browser(bundleID: bundleID, name: name, appURL: url)
+        return Browser(bundleID: bundleID, name: displayName(url), appURL: url)
     }
 
+    /// `profile` may be a Chrome folder name, display name, or email.
     func open(_ urls: [URL], profile: String? = nil) {
-        if let profile, let executable = Bundle(url: appURL)?.executableURL {
-            // Chromium forwards to the running instance and opens the link in that profile.
-            let process = Process()
-            process.executableURL = executable
-            process.arguments = ["--profile-directory=\(profile)"] + urls.map(\.absoluteString)
-            do {
-                try process.run()
-                NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first?.activate()
-                return
-            } catch {
-                NSLog("Ferry: profile launch failed, opening normally: \(error)")
-            }
-        }
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true
-        NSWorkspace.shared.open(urls, withApplicationAt: appURL, configuration: configuration)
+        guard let profile else {
+            NSWorkspace.shared.open(urls, withApplicationAt: appURL, configuration: configuration)
+            return
+        }
+        // Same as `open -na Chrome --args`: the new instance hands the link to the running one
+        // in the requested profile, then exits.
+        configuration.createsNewApplicationInstance = true
+        configuration.arguments = ["--profile-directory=\(ChromeProfile.resolve(profile, for: bundleID))"]
+            + urls.map(\.absoluteString)
+        NSWorkspace.shared.openApplication(at: appURL, configuration: configuration) { _, error in
+            if let error { NSLog("Ferry: profile launch failed: \(error)") }
+        }
+    }
+
+    private static func displayName(_ url: URL) -> String {
+        FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
+    }
+}
+
+/// One pickable destination: a browser, or one profile of a Chromium browser.
+struct Target {
+    let browser: Browser
+    let profile: ChromeProfile?
+
+    var title: String {
+        guard let profile else { return browser.name }
+        let email = profile.email.map { " (\($0))" } ?? ""
+        return "\(browser.name) – \(profile.name)\(email)"
+    }
+
+    /// Browsers with readable profiles are expanded into one target per profile.
+    static func all(hiding hidden: [String] = []) -> [Target] {
+        Browser.installed(hiding: hidden).flatMap { browser -> [Target] in
+            let profiles = ChromeProfile.list(for: browser.bundleID)
+            if profiles.isEmpty { return [Target(browser: browser, profile: nil)] }
+            return profiles.map { Target(browser: browser, profile: $0) }
+        }
     }
 }

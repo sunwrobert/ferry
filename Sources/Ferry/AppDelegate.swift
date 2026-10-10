@@ -45,11 +45,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let defaultItem = NSMenuItem(title: "Default Browser", action: nil, keyEquivalent: "")
         let submenu = NSMenu()
-        submenu.addItem(makeDefaultChoice(title: "Ask Every Time", id: nil, current: config.defaultBrowser))
+        let ask = makeItem("Ask Every Time", #selector(setDefault(_:)))
+        ask.state = config.defaultBrowser == nil ? .on : .off
+        submenu.addItem(ask)
         submenu.addItem(.separator())
-        for browser in Browser.installed() {
-            let choice = makeDefaultChoice(title: browser.name, id: browser.bundleID, current: config.defaultBrowser)
-            choice.image = browser.icon
+        for target in Target.all(hiding: config.hiddenBrowsers ?? []) {
+            let choice = makeItem(target.title, #selector(setDefault(_:)))
+            choice.image = target.browser.icon
+            choice.representedObject = target
+            choice.state = isDefault(target, config) ? .on : .off
             submenu.addItem(choice)
         }
         defaultItem.submenu = submenu
@@ -74,16 +78,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return item
     }
 
-    private func makeDefaultChoice(title: String, id: String?, current: String?) -> NSMenuItem {
-        let item = makeItem(title, #selector(setDefault(_:)))
-        item.representedObject = id
-        item.state = id == current ? .on : .off
-        return item
+    private func isDefault(_ target: Target, _ config: Config) -> Bool {
+        guard target.browser.bundleID == config.defaultBrowser else { return false }
+        guard let profile = target.profile else { return config.defaultProfile == nil }
+        return config.defaultProfile.map { ChromeProfile.resolve($0, for: target.browser.bundleID) } == profile.directory
     }
 
     @objc private func setDefault(_ sender: NSMenuItem) {
+        let target = sender.representedObject as? Target
         var config = Config.load()
-        config.defaultBrowser = sender.representedObject as? String
+        config.defaultBrowser = target?.browser.bundleID
+        config.defaultProfile = target?.profile?.directory
         config.save()
     }
 

@@ -16,7 +16,7 @@ final class Router: NSObject {
             return
         }
         if let id = config.defaultBrowser, let browser = Browser.find(id) {
-            browser.open([url])
+            browser.open([url], profile: config.defaultProfile)
             return
         }
         showPicker(for: url, config: config)
@@ -32,13 +32,13 @@ final class Router: NSObject {
         menu.addItem(header)
         menu.addItem(.separator())
 
-        for (index, browser) in Browser.installed(hiding: config.hiddenBrowsers ?? []).enumerated() {
+        for (index, target) in Target.all(hiding: config.hiddenBrowsers ?? []).enumerated() {
             let key = index < 9 ? String(index + 1) : ""
-            let item = NSMenuItem(title: browser.name, action: #selector(pick(_:)), keyEquivalent: key)
+            let item = NSMenuItem(title: target.title, action: #selector(pick(_:)), keyEquivalent: key)
             item.keyEquivalentModifierMask = []
             item.target = self
-            item.image = browser.icon
-            item.representedObject = browser.bundleID
+            item.image = target.browser.icon
+            item.representedObject = target
             menu.addItem(item)
         }
 
@@ -52,9 +52,8 @@ final class Router: NSObject {
     }
 
     @objc private func pick(_ sender: NSMenuItem) {
-        guard let url = pendingURL, let id = sender.representedObject as? String,
-              let browser = Browser.find(id) else { return }
-        browser.open([url])
+        guard let url = pendingURL, let target = sender.representedObject as? Target else { return }
+        target.browser.open([url], profile: target.profile?.directory)
         pendingURL = nil
     }
 

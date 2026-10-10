@@ -10,7 +10,7 @@ struct Rule: Codable {
     var fromApp: String?
     /// Bundle ID of the browser to open, e.g. `com.google.Chrome`.
     var browser: String
-    /// Chromium profile directory, e.g. `Default` or `Profile 1`.
+    /// Chrome profile: folder (`Profile 1`), display name (`Work`), or email.
     var profile: String?
 
     func matches(_ url: URL, source: String?) -> Bool {
@@ -32,6 +32,8 @@ struct Rule: Codable {
 struct Config: Codable {
     /// Browser bundle ID used when no rule matches. `nil` shows the picker.
     var defaultBrowser: String?
+    /// Chrome profile for `defaultBrowser`: folder, display name, or email.
+    var defaultProfile: String?
     var rules: [Rule]
     /// Browser bundle IDs to leave out of the picker.
     var hiddenBrowsers: [String]?
@@ -40,10 +42,10 @@ struct Config: Codable {
         .appendingPathComponent(".config/ferry/config.json")
 
     static let starter = Config(
-        defaultBrowser: "com.apple.Safari",
+        defaultBrowser: "com.google.Chrome",
+        defaultProfile: "Default",
         rules: [
-            Rule(host: "meet.google.com", browser: "com.google.Chrome"),
-            Rule(fromApp: "com.tinyspeck.slackmacgap", browser: "com.google.Chrome", profile: "Default"),
+            Rule(host: "github.com", browser: "com.google.Chrome", profile: "Default"),
         ],
         hiddenBrowsers: []
     )
@@ -58,7 +60,7 @@ struct Config: Codable {
             return try JSONDecoder().decode(Config.self, from: data)
         } catch {
             NSLog("Ferry: invalid config, showing picker: \(error)")
-            return Config(defaultBrowser: nil, rules: [], hiddenBrowsers: nil)
+            return Config(defaultBrowser: nil, defaultProfile: nil, rules: [], hiddenBrowsers: nil)
         }
     }
 
