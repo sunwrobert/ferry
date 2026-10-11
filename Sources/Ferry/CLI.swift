@@ -232,11 +232,11 @@ enum FerryCLI {
 
     // MARK: App commands
 
-    static let setup = Command(description: "Ask Ferry.app for access to Chrome profiles (shows the macOS prompt)") { _ in
+    static let setup = Command(description: "Grant Ferry.app access to Chrome profiles (opens a Grant Access window)") { _ in
         guard ProfileAccess.requestFromApp() else {
             return .error(code: "PROFILES_UNREADABLE", message: """
-                Still can't read Chrome profiles. If you clicked Don't Allow, enable Ferry under System Settings → \
-                Privacy & Security → App Management or Full Disk Access, then run `ferry setup` again.
+                Still can't read Chrome profiles. Run `ferry setup` again and, in the window that opens, choose \
+                Chrome's folder (it opens there) and click Grant Access.
                 """)
         }
         let profiles = ChromeProfile.list(for: ProfileAccess.chromeID)

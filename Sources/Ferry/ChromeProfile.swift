@@ -30,10 +30,18 @@ struct ChromeProfile: Codable {
         return readCache()[bundleID] ?? []
     }
 
+    static func defaultDataFolder(for bundleID: String) -> URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/\(dataFolders[bundleID] ?? "")")
+    }
+
     private static func readLocalState(for bundleID: String) -> [ChromeProfile]? {
-        guard let folder = dataFolders[bundleID] else { return nil }
-        let url = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/\(folder)/Local State")
+        guard dataFolders[bundleID] != nil else { return nil }
+        let granted = bundleID == ProfileAccess.chromeID ? ProfileAccess.grantedFolder() : nil
+        let folder = granted ?? defaultDataFolder(for: bundleID)
+        let scoped = granted?.startAccessingSecurityScopedResource() ?? false
+        defer { if scoped { granted?.stopAccessingSecurityScopedResource() } }
+        let url = folder.appendingPathComponent("Local State")
         do {
             let state = try JSONDecoder().decode(LocalState.self, from: Data(contentsOf: url))
             let cache = state.profile.infoCache

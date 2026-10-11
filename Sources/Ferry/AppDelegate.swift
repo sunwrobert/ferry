@@ -104,7 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// Reading Chrome's data is what makes macOS show the prompt; retry while the user answers it.
     @objc private func requestProfileAccess() {
-        ProfileAccess.readUntilAllowed(attemptsLeft: 60)
+        ProfileAccess.requestAccess()
     }
 
     @objc private func editConfig() {
