@@ -65,7 +65,7 @@ final class RulesMenu: NSObject {
         let config = Config.load()
         let targets = Target.all(hiding: config.hiddenBrowsers ?? [])
         guard let (host, target) = Self.promptForRule(targets: targets) else { return }
-        Self.save(rule: Rule(host: host, browser: target.browser.bundleID, profile: target.profile?.directory), at: nil)
+        Self.save(rule: Rule(host: host, browser: target.browser.bundleID, profile: target.profile?.ref), at: nil)
     }
 
     @objc private func retarget(_ sender: NSMenuItem) {
@@ -73,7 +73,7 @@ final class RulesMenu: NSObject {
         Self.update { config in
             guard config.rules.indices.contains(choice.index) else { return }
             config.rules[choice.index].browser = choice.target.browser.bundleID
-            config.rules[choice.index].profile = choice.target.profile?.directory
+            config.rules[choice.index].profile = choice.target.profile?.ref
         }
     }
 
@@ -159,7 +159,8 @@ final class RulesMenu: NSObject {
     static func targetText(_ bundleID: String, _ profile: String?) -> String {
         let name = Browser.find(bundleID)?.name ?? bundleID
         guard let profile else { return name }
-        let profileName = ChromeProfile.list(for: bundleID).first { $0.directory == profile }?.name ?? profile
+        let directory = ChromeProfile.resolve(profile, for: bundleID)
+        let profileName = ChromeProfile.list(for: bundleID).first { $0.directory == directory }?.name ?? profile
         return "\(name) – \(profileName)"
     }
 

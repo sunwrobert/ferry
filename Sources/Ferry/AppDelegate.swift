@@ -98,7 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let target = sender.representedObject as? Target
         var config = Config.load()
         config.defaultBrowser = target?.browser.bundleID
-        config.defaultProfile = target?.profile?.directory
+        config.defaultProfile = target?.profile?.ref
         config.save()
     }
 

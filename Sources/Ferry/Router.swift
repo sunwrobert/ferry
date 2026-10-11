@@ -72,7 +72,7 @@ final class Router: NSObject {
     @objc private func pickAlways(_ sender: NSMenuItem) {
         guard let url = pendingURL, let host = RulesMenu.siteHost(url),
               let target = sender.representedObject as? Target else { return }
-        RulesMenu.save(rule: Rule(host: host, browser: target.browser.bundleID, profile: target.profile?.directory), at: nil)
+        RulesMenu.save(rule: Rule(host: host, browser: target.browser.bundleID, profile: target.profile?.ref), at: nil)
         target.browser.open([url], profile: target.profile?.directory)
         pendingURL = nil
     }

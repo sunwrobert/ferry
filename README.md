@@ -14,11 +14,30 @@ Pure Swift + AppKit, no dependencies, ~180 KB binary. No windows or web views. I
 
 ## Install
 
+On a new Mac, run:
+
 ```bash
-./scripts/build.sh --install
+curl -fsSL https://raw.githubusercontent.com/sunwrobert/ferry/main/scripts/install.sh | bash
 ```
 
-That builds `Ferry.app`, copies it to `~/Applications`, and launches it. Then open the menu bar icon, choose **Make Ferry the System Browser**, and confirm the macOS prompt.
+That clones the repo, builds and installs `Ferry.app`, links the `ferry` CLI to `~/.local/bin`, and runs `ferry setup`. Setup asks for Chrome profile access (click **Grant Access**), turns on launch at login, makes Ferry the default browser (confirm the macOS dialog), and installs the agent skill. Pass `--rules <file>` to import rules from another Mac.
+
+### Or let an agent do it
+
+Paste this into Claude Code, Codex, pi, or any coding agent:
+
+```text
+Set up Ferry (https://github.com/sunwrobert/ferry) on this Mac by following its AGENTS.md. Then route YouTube to my personal Chrome profile and GitHub plus anything openrouter to my work profile.
+```
+
+### Moving to another Mac
+
+```bash
+ferry export --json > ferry-rules.json    # on the old Mac
+ferry import ferry-rules.json             # on the new one
+```
+
+Rules store Chrome profiles by email, so they keep working when the new Mac's profile folders are numbered differently. The file has your email addresses in it, so keep it private.
 
 ## CLI
 

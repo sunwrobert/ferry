@@ -33,6 +33,8 @@ enum FerryCLI {
         .command("status", status)
         .command("system-browser", systemBrowser)
         .command("login", login)
+        .command("export", export)
+        .command("import", importConfig)
         .command("edit", edit)
         .command("quit", quit)
     }
@@ -232,16 +234,39 @@ enum FerryCLI {
 
     // MARK: App commands
 
-    static let setup = Command(description: "Grant Ferry.app access to Chrome profiles (opens a Grant Access window)") { _ in
-        guard ProfileAccess.requestFromApp() else {
-            return .error(code: "PROFILES_UNREADABLE", message: """
-                Still can't read Chrome profiles. Run `ferry setup` again and, in the window that opens, choose \
-                Chrome's folder (it opens there) and click Grant Access.
-                """)
+    static let setup = Command(
+        description: "First-run setup: Chrome profile access, system browser, launch at login",
+        options: [
+            "skipSystemBrowser": .boolean.default(false).describe("Leave the default browser alone"),
+            "skipLogin": .boolean.default(false).describe("Don't launch Ferry at login"),
+        ],
+        hint: "macOS asks you to confirm the system browser change; links without a rule still open in your fallback browser."
+    ) { context in
+        var steps = JSONObject()
+        var next: [Cta] = []
+
+        let profiles = ProfileAccess.requestFromApp() ? ChromeProfile.list(for: ProfileAccess.chromeID) : []
+        steps["chromeProfiles"] = .array(profiles.map { ["name": .string($0.name), "email": $0.email.map(JSON.string) ?? nil] })
+        if profiles.isEmpty, NSWorkspace.shared.urlForApplication(withBundleIdentifier: ProfileAccess.chromeID) != nil {
+            next.append(Cta("setup", description: "grant access to Chrome profiles (click Grant Access)"))
         }
-        let profiles = ChromeProfile.list(for: ProfileAccess.chromeID)
-        let cta: CtaBlock? = isSystemBrowser ? nil : [Cta("system-browser", description: "route clicked links through Ferry")]
-        return .ok(["chromeProfiles": .array(profiles.map { ["name": .string($0.name), "directory": .string($0.directory)] })], cta: cta)
+
+        if context.options["skipLogin"] != true {
+            steps["launchAtLogin"] = .bool(AppControl.send(.loginOn) == "login=true")
+        }
+
+        if context.options["skipSystemBrowser"] == true {
+            steps["systemBrowser"] = .bool(isSystemBrowser)
+        } else if isSystemBrowser {
+            steps["systemBrowser"] = true
+        } else {
+            _ = AppControl.send(.systemBrowser)
+            steps["systemBrowser"] = "confirm the macOS dialog"
+            next.append(Cta("status", description: "check that Ferry is the system browser"))
+        }
+
+        next.append(Cta("skills add", description: "teach your coding agents to configure Ferry"))
+        return .ok(.object(steps), cta: CtaBlock(description: "Next:", commands: next))
     }
 
     static let systemBrowser = Command(description: "Make Ferry the system browser (macOS asks to confirm)") { _ in
@@ -257,6 +282,49 @@ enum FerryCLI {
         let command: AppControl.Command = context.args["state"] == "on" ? .loginOn : .loginOff
         guard let reply = AppControl.send(command) else { return notResponding }
         return .ok(["launchAtLogin": .bool(reply == "login=true")])
+    }
+
+    static let export = Command(
+        description: "Print the config with profiles as emails, ready to copy to another Mac",
+        mcp: readOnly
+    ) { _ in
+        var config = Config.load()
+        config.defaultProfile = config.defaultBrowser.flatMap { browser in config.defaultProfile.map { portable($0, browser) } }
+        config.rules = config.rules.map { rule in
+            var copy = rule
+            copy.profile = rule.profile.map { portable($0, rule.browser) }
+            return copy
+        }
+        return try .value(config)
+    }
+
+    static let importConfig = Command(
+        description: "Replace the config with a file from `ferry export` (or merge its rules)",
+        args: ["file": .string.describe("Path to an exported config")],
+        options: ["merge": .boolean.default(false).describe("Add the file's rules to yours instead of replacing")],
+        destructive: true
+    ) { context in
+        let path = (context.args["file"]!.stringValue! as NSString).expandingTildeInPath
+        guard let data = FileManager.default.contents(atPath: path) else {
+            return .error(code: "FILE_NOT_FOUND", message: "No file at \(path)")
+        }
+        let incoming: Config
+        do {
+            incoming = try JSONDecoder().decode(Config.self, from: data)
+        } catch {
+            return .error(code: "INVALID_CONFIG", message: "\(path) is not a Ferry config: \(error.localizedDescription)")
+        }
+        var config = context.options["merge"] == true ? Config.load() : incoming
+        if context.options["merge"] == true {
+            for rule in incoming.rules { config.upsert(rule, at: config.rules.count) }
+        }
+        config.save()
+        let unknown = Set((config.rules.compactMap { rule in rule.profile.map { (rule.browser, $0) } }
+            + [config.defaultBrowser.flatMap { b in config.defaultProfile.map { (b, $0) } }].compactMap { $0 })
+            .filter { ChromeProfile.supports($0.0) && ChromeProfile.resolve($0.1, for: $0.0) == nil }
+            .map(\.1))
+        let cta: CtaBlock? = unknown.isEmpty ? nil : [Cta("browsers", description: "these profiles aren't on this Mac yet: \(unknown.sorted().joined(separator: ", "))")]
+        return .ok(["rules": rulesJSON(config), "missingProfiles": .array(unknown.sorted().map(JSON.string))], cta: cta)
     }
 
     static let edit = Command(description: "Open the config file in your text editor") { _ in
@@ -312,8 +380,15 @@ enum FerryCLI {
         guard let bundleID else { return nil }
         let name = Browser.find(bundleID)?.name ?? "\(bundleID) (not installed)"
         guard let profile else { return name }
-        let label = ChromeProfile.list(for: bundleID).first { $0.directory == profile }?.name ?? profile
+        let directory = ChromeProfile.resolve(profile, for: bundleID)
+        let label = ChromeProfile.list(for: bundleID).first { $0.directory == directory }?.name ?? profile
         return "\(name) – \(label)"
+    }
+
+    /// A profile reference that works on any Mac: the email if this Mac knows it.
+    private static func portable(_ profile: String, _ bundleID: String) -> String {
+        guard let directory = ChromeProfile.resolve(profile, for: bundleID) else { return profile }
+        return ChromeProfile.list(for: bundleID).first { $0.directory == directory }?.ref ?? profile
     }
 
     private static func ruleIndex(_ value: JSON?, in config: Config) -> Int? {
@@ -352,7 +427,9 @@ enum FerryCLI {
                 code: "PROFILE_NOT_FOUND", message: "\(match.name) has no profile '\(profile)'. Profiles: \(names)", cta: ["browsers"]
             )))
         }
-        return .success((match.bundleID, directory))
+        // Store the email so the rule still works on another Mac where folder names differ.
+        let ref = ChromeProfile.list(for: match.bundleID).first { $0.directory == directory }?.ref ?? directory
+        return .success((match.bundleID, ref))
     }
 
     /// Bundle ID for an app name; anything already shaped like a bundle ID passes through.

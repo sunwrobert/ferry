@@ -7,6 +7,10 @@ struct ChromeProfile: Codable {
     let name: String
     let email: String?
 
+    /// What rules store: the signed-in email when there is one, since folder names
+    /// (`Profile 1`, `Profile 2`) differ from Mac to Mac while the email does not.
+    var ref: String { email ?? directory }
+
     /// Application Support folders for the Chromium browsers Ferry knows how to read.
     private static let dataFolders: [String: String] = [
         "com.google.Chrome": "Google/Chrome",

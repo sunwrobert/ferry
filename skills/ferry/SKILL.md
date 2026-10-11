@@ -15,6 +15,10 @@ Ferry routes every clicked link to a browser and, for Chrome, a profile. Configu
 4. Add rules with `ferry add`, one per site.
 5. Verify every rule with `ferry test <url>` and report the output.
 
+## New Mac
+
+If `ferry` isn't installed, follow https://github.com/sunwrobert/ferry/blob/main/AGENTS.md: run the install script, have the user click Grant Access and confirm the browser dialog, then check `ferry status`. To copy rules from another Mac, use `ferry export --json` there and `ferry import <file>` here.
+
 ## Commands
 
 ```bash
@@ -38,7 +42,7 @@ ferry test https://example.com --from-app slack
 
 - `--host youtube.com` also matches subdomains (`www.youtube.com`, `m.youtube.com`). Short links on other domains need their own rule, e.g. `youtu.be`.
 - Fields on one rule are ANDed. Put specific rules above broad ones with `--at` or `ferry move`.
-- `--profile` accepts a display name, email, or folder (`Default`, `Profile 1`).
+- `--profile` accepts a display name, email, or folder (`Default`, `Profile 1`). Rules are saved with the email so they work on any Mac.
 
 ## Errors
 
